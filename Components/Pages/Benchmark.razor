@@ -1,0 +1,121 @@
+﻿@page "/"
+@rendermode InteractiveServer
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+
+<PageTitle>Home</PageTitle>
+
+<center>
+    <h1>
+        a simple benchmark of both search functions
+    </h1>
+    <p class="text-body-secondary">i'm too lazy to bother with stylizing</p>
+
+    <input type="button" @onclick="FullBench" value="run banchmark" class="mb-2" /> <br>
+    <input type="button" @onclick="BenchInclude" value="banchmark include only" />
+    <input type="button" @onclick="BenchInverse" value="banchmark inverse only" />
+
+    <div class="row mt-5">
+        <div class="col-12 col-sm-6">
+            <h3>include check</h3>
+            @IncludeTime ms
+        </div>
+        <div class="col-12 col-sm-6">
+            <h3>inverse search</h3>
+            @InverseTime ms
+        </div>
+    </div>
+</center>
+
+<div class="mt-5">
+    <h2 class="mb-3">Benchmark setup</h2>
+    <p>
+        while the site is made with blazor, both functions are written in javascript and are running on the browser.
+        <br />the reason i chose to make the site in blazor is that so i can have access to c# <code>StopWatch</code>
+        class.
+        <br />both functions are tested against a list of keywords
+        (<code>lightweight, Shortcodes, iframe, class, Embed, load, xyz</code>) that are hardcoded in the javascript file,
+        i did this to eliminate any lag of randomly picking words.
+        <br />both functions were also trimmed down to the bones, they only search for the keyword, fill an array with the data then return.
+        <br />both functions run 1000 times for each keyword, so in total there's 7000 searches made.
+        <br />finally the entire script is compressed using <a
+            href="https://www.digitalocean.com/community/tools/minify">digital ocean's minify tool</a>.
+        <br /> <i>i used <code>str.include</code> because it <a href="https://jsben.ch/tJt8o">performs the best on both
+                chromium and firefox</a> </i>
+    </p>
+</div>
+
+<div class="mt-5">
+    <h2 class="mb-3">Miscellaneous</h2>
+    <div class="row mt-5">
+        <div class="col-12 col-sm-6">
+            <h3>Simple include</h3>
+            <ul>
+                <li>total JS size*: 275 bytes</li>
+                <li>total JSON size: 71.8 Kib</li>
+                <li>total Time firefox***: 70ms</li>
+                <li>total Time chrome***: 90ms</li>
+            </ul>
+        </div>
+        <div class="col-12 col-sm-6">
+            <h3>inverse search</h3>
+            <ul>
+                <li>total JS size*: 153 bytes (17.6k total**)</li>
+                <li>total JSON size: 220.2Kib</li>
+                <li>total Time firefox***: 170ms</li>
+                <li>total Time chrome***: 60ms</li>
+            </ul>
+        </div>
+    </div>
+    <ul>
+        <li>
+            <i>* the total javascript is after minifying it using digital ocean's minify tool</i>
+        </li>
+        <li>
+            <i>** the inverse search requires <code>elasticlunr.min.js</code> which is 17.6Kib</i>
+        </li>
+        <li>
+            <i>*** to be specific i used "librewolf" and "ungoogled-chromium" for testing</i>
+        </li>
+    </ul>
+    <i>all of this was tested on an i3-8100 running arch linux</i>
+</div>
+
+@code {
+    private IJSObjectReference? module;
+    long IncludeTime;
+    long InverseTime;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+            module = await JS.InvokeAsync<IJSObjectReference>("import", "/Components/Pages/Benchmark.razor.js");
+    }
+    async Task FullBench()
+    {
+        await BenchInverse();
+        await BenchInclude();
+    }
+    async Task BenchInverse()
+    {
+        var clock1 = new System.Diagnostics.Stopwatch();
+        clock1.Start();
+        await module.InvokeVoidAsync("TestInverse");
+        InverseTime = clock1.ElapsedMilliseconds;
+    }
+    async Task BenchInclude()
+    {
+        var clock2 = new System.Diagnostics.Stopwatch();
+        clock2.Start();
+        await module.InvokeVoidAsync("TestInclude");
+        IncludeTime = clock2.ElapsedMilliseconds;
+    }
+
+    async ValueTask IAsyncDisposable.DisposeAsync()
+    {
+        if (module is not null)
+        {
+            await module.DisposeAsync();
+        }
+    }
+}
